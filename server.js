@@ -42,7 +42,15 @@ app.post('/api/save-location', async (req, res) => {
     res.status(500).json({ error: 'حدث خطأ داخلي في السيرفر' });
   }
 });
+// إضافة للتعامل مع ملف index.html
+const path = require('path');
 
+// إخبار السيرفر أن يرسل ملف index.html عند فتح الرابط الرئيسي
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 // 4. تشغيل السيرفر
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

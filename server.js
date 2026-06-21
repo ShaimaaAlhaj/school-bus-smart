@@ -1,0 +1,50 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+const app = express();
+
+// إعدادات أساسية للسماح باستقبال البيانات من المتصفح
+app.use(cors());
+app.use(express.json()); 
+
+// 1. الاتصال بقاعدة البيانات
+const dbUrl = process.env.DATABASE_URL || 'mongodb://127.0.0.1:27017/school_bus';
+mongoose.connect(dbUrl)
+  .then(() => console.log('✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح!'))
+  .catch((err) => console.error('❌ خطأ في الاتصال بقاعدة البيانات:', err));
+
+// 2. تصميم "هيكل" البيانات (Schema)
+const locationSchema = new mongoose.Schema({
+  phoneNumber: String,
+  lat: Number,
+  lng: Number,
+  createdAt: { type: Date, default: Date.now }
+});
+
+// إنشاء الـ Model (والذي سيتحول لجدول اسمه locations تلقائياً)
+const Location = mongoose.model('Location', locationSchema);
+
+// 3. مسار (API) لاستقبال الإحداثيات من واجهة المستخدم
+app.post('/api/save-location', async (req, res) => {
+  try {
+    const { phoneNumber, lat, lng } = req.body;
+    
+    // إنشاء سجل جديد وحفظه
+    const newLocation = new Location({ phoneNumber, lat, lng });
+    await newLocation.save(); // هنا يحدث السحر: يتم إنشاء الداتا بيز تلقائياً إذا لم تكن موجودة!
+
+    console.log(`تم استلام وحفظ موقع جديد للرقم: ${phoneNumber}`);
+    res.status(201).json({ message: 'تم حفظ الموقع بنجاح!' });
+  } catch (error) {
+    console.error("خطأ أثناء الحفظ:", error);
+    res.status(500).json({ error: 'حدث خطأ داخلي في السيرفر' });
+  }
+});
+
+// 4. تشغيل السيرفر
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 السيرفر شغال ومستعد لاستقبال البيانات على البورت ${PORT}`);
+});

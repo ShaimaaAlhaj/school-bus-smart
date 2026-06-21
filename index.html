@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>باص المدرسة الذكي</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body { font-family: 'Noto Sans Arabic', sans-serif; }
+    #map { height: 380px; width: 100%; border-radius: 12px; }
+    .step { display: none; }
+    .step.active { display: block; }
+    .search-dropdown {
+      position: absolute;
+      width: 100%;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 1000;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .search-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      border-bottom: 1px solid #f3f4f6;
+      text-align: right;
+    }
+    .search-item:hover { background: #fef9c3; } /* لون أصفر فاتح عند التمرير */
+    .spinner { display: none; }
+    .spinner.active {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid #d1d5db;
+      border-top-color: #eab308;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+
+</head>
+<body class="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+
+  <div class="w-full max-w-md">
+
+    <div id="step1" class="step active">
+      <div class="bg-white rounded-2xl shadow-lg p-6 border-t-8 border-yellow-400">
+
+        <div class="flex justify-center mb-5">
+          <div class="bg-yellow-50 w-20 h-20 rounded-full flex items-center justify-center relative shadow-inner">
+            <i class="fa-solid fa-bus text-yellow-500 text-4xl"></i>
+          </div>
+        </div>
+
+        <h1 class="text-2xl font-bold text-center text-slate-800 mb-1">باص المدرسة الذكي</h1>
+        <p class="text-center text-slate-500 mb-5">تحديد موقع سكن الطالب</p>
+
+        <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl p-3 mb-5 text-sm">
+          <i class="fa-solid fa-circle-info ml-1"></i>
+          هذه الخدمة مخصصة للأهالي لتحديد موقع سكن أبنائهم لخط الباص المدرسي
+        </div>
+
+        <div class="mb-5">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">رقم الهاتف المرتبط بالطالب</label>
+        <input
+            id="phone-input"
+            type="tel"
+            placeholder="07XXXXXXXX"
+            dir="ltr"
+            maxlength="10"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+            class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-right text-slate-800 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 text-lg font-medium transition-all"
+          />
+          <p id="phone-error" class="text-red-500 text-sm mt-1 hidden"></p>
+        </div>
+
+        <button
+          onclick="goToMap()"
+          class="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-3.5 rounded-xl text-lg shadow-md transition-all active:scale-95"
+        >
+          متابعة لتحديد الموقع
+        </button>
+      </div>
+    </div>
+
+    <div id="step2" class="step">
+      <div class="space-y-3">
+
+        <div class="bg-orange-50 border-r-4 border-orange-400 text-orange-800 rounded-xl p-3 text-sm font-medium shadow-sm">
+          <i class="fa-solid fa-triangle-exclamation ml-1"></i>
+          يرجى التأكد من تواجدك في المنزل أو أمامه عند تحديد الموقع لضمان دقة مسار الحافلة.
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden border-t-8 border-yellow-400">
+
+          <div class="flex justify-between items-center px-4 py-3 bg-slate-50 border-b">
+            <span class="text-sm text-slate-500 font-medium">رقم الهاتف:</span>
+            <span id="display-phone" class="font-bold text-slate-800 tracking-wider" dir="ltr"></span>
+          </div>
+
+          <div class="p-4 space-y-4">
+
+            <div class="relative">
+              <div class="flex items-center border-2 border-slate-200 rounded-xl overflow-hidden focus-within:border-yellow-400 focus-within:ring-2 focus-within:ring-yellow-100 transition-all">
+                <input
+                  id="search-input"
+                  type="text"
+                  placeholder="ابحث عن منطقتك (مثال: طبربور)..."
+                  oninput="onSearchInput()"
+                  class="flex-1 px-4 py-3 text-sm text-slate-800 focus:outline-none"
+                />
+                <div class="px-4 bg-slate-50 h-full flex items-center border-r border-slate-200">
+                  <span id="search-spinner" class="spinner"></span>
+                  <i id="search-icon" class="fa-solid fa-magnifying-glass text-slate-400"></i>
+                </div>
+              </div>
+              <div id="search-results" class="search-dropdown hidden mt-1"></div>
+            </div>
+
+            <div class="relative rounded-xl overflow-hidden border-2 border-slate-200 shadow-inner">
+              <div id="map"></div>
+              
+              <button
+                onclick="useGPS()"
+                title="تحديد موقعي الحالي"
+                class="absolute bottom-4 right-4 z-[500] bg-yellow-400 shadow-lg border border-yellow-500 rounded-full w-12 h-12 flex items-center justify-center hover:bg-yellow-500 transition-colors active:scale-95"
+              >
+                <i class="fa-solid fa-location-crosshairs text-slate-900 text-xl"></i>
+              </button>
+
+              <div class="absolute top-2 left-1/2 transform -translate-x-1/2 z-[400] bg-white/90 backdrop-blur px-3 py-1 rounded-lg shadow-sm border border-slate-200 text-xs font-bold text-slate-600 pointer-events-none">
+                👆 يمكنك سحب الدبوس لتعديل الموقع
+              </div>
+            </div>
+
+            <button
+              id="save-btn"
+              onclick="saveLocation()"
+              class="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-4 rounded-xl text-lg shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 mt-2"
+            >
+              <i class="fa-solid fa-check-circle text-xl"></i>
+              حفظ الموقع بشكل نهائي
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="step3" class="step">
+      <div class="bg-white rounded-2xl shadow-lg p-8 text-center border-t-8 border-yellow-400">
+        <div class="bg-yellow-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+          <i class="fa-solid fa-bus-circle-check text-yellow-500 text-5xl"></i>
+        </div>
+        <h2 class="text-3xl font-bold text-slate-800 mb-2">تم حفظ الموقع بنجاح!</h2>
+
+        <div class="bg-slate-50 rounded-xl p-5 text-sm text-right space-y-3 mb-6 mt-6 border border-slate-200">
+          <div class="flex justify-between items-center border-b pb-2">
+            <span class="text-slate-500 font-medium">رقم الهاتف:</span>
+            <span id="success-phone" class="font-bold text-slate-800 text-base" dir="ltr"></span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-500 font-medium">الإحداثيات:</span>
+            <span id="success-coords" class="font-bold text-slate-800" dir="ltr"></span>
+          </div>
+        </div>
+
+        <p class="text-slate-600 mb-8 font-medium">شكراً لك! سيتم دمج موقعك في مسار الباص الذكي.</p>
+
+        <button
+          onclick="reset()"
+          class="w-full border-2 border-slate-200 text-slate-700 font-bold py-3.5 rounded-xl hover:bg-slate-50 transition-colors"
+        >
+          تعديل الموقع / تسجيل رقم آخر
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==============================
+    // المتغيرات العامة
+    // ==============================
+    const API_URL = 'http://localhost:5000/api';
+    let currentLat = 31.95; // إحداثيات عمان الافتراضية
+    let currentLng = 35.91;
+    let map, marker;
+    let searchTimer = null;
+    let userPhone = '';
+
+    // ==============================
+    // تهيئة الخريطة
+    // ==============================
+    function initMap() {
+      if (map) return;
+
+      map = L.map('map').setView([currentLat, currentLng], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      // تصحيح أيقونة الدبوس
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      marker = L.marker([currentLat, currentLng], { draggable: true }).addTo(map);
+
+      // تحديث الإحداثيات عند سحب الدبوس
+      marker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        currentLat = pos.lat;
+        currentLng = pos.lng;
+      });
+    }
+
+    // ==============================
+    // خطوة 1: التحقق من الهاتف والانتقال
+    // ==============================
+// ==============================
+    // خطوة 1: التحقق من الهاتف والانتقال
+    // ==============================
+    function goToMap() {
+      const phone = document.getElementById('phone-input').value.trim();
+      const err = document.getElementById('phone-error');
+
+      // شرط صارم: يجب أن يبدأ بـ 07 وبعده 8 أرقام (المجموع 10)
+      const phoneRegex = /^07\d{8}$/;
+
+      if (!phoneRegex.test(phone)) {
+        err.textContent = '⚠️ عذراً، رقم الهاتف يجب أن يبدأ بـ 07 ويتكون من 10 أرقام.';
+        err.classList.remove('hidden');
+        return;
+      }
+
+      // إذا الرقم صحيح، نخفي رسالة الخطأ ونكمل
+      err.classList.add('hidden');
+      userPhone = phone;
+      document.getElementById('display-phone').textContent = phone;
+
+      // إظهار شاشة الخريطة
+      showStep('step2');
+
+      // تهيئة الخريطة ثم إظهار التنبيه وطلب الصلاحية تلقائياً
+      setTimeout(() => {
+        initMap();
+        alert("تنبيه هام ⚠️\n\nيرجى التأكد من أنك متواجد داخل المنزل حالياً أو أمامه مباشرة قبل الموافقة على تحديد الموقع، وذلك لضمان دقة مسار باص المدرسة وعدم حدوث تأخير.");
+        useGPS();
+      }, 300);
+    }
+
+    // ==============================
+    // خطوة 2: البحث بـ Nominatim
+    // ==============================
+    function onSearchInput() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(doSearch, 500);
+    }
+
+    async function doSearch() {
+      const query = document.getElementById('search-input').value.trim();
+      const resultsDiv = document.getElementById('search-results');
+
+      if (query.length < 3) {
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+
+      setSearchLoading(true);
+
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=jo&format=json&limit=5`
+        );
+        const data = await res.json();
+
+        if (data.length === 0) {
+          resultsDiv.classList.add('hidden');
+          return;
+        }
+
+        resultsDiv.innerHTML = data.map((item, i) =>
+          `<div class="search-item" onclick="selectResult(${item.lat}, ${item.lon}, '${item.display_name.replace(/'/g, "\\'")}')">
+            ${item.display_name}
+          </div>`
+        ).join('');
+        resultsDiv.classList.remove('hidden');
+      } catch(e) {
+        resultsDiv.classList.add('hidden');
+      } finally {
+        setSearchLoading(false);
+      }
+    }
+
+    function setSearchLoading(loading) {
+      document.getElementById('search-spinner').className = loading ? 'spinner active' : 'spinner';
+      document.getElementById('search-icon').style.display = loading ? 'none' : 'inline';
+    }
+
+    function selectResult(lat, lng, name) {
+      currentLat = parseFloat(lat);
+      currentLng = parseFloat(lng);
+
+      map.flyTo([currentLat, currentLng], 16);
+      marker.setLatLng([currentLat, currentLng]);
+
+      document.getElementById('search-input').value = name;
+      document.getElementById('search-results').classList.add('hidden');
+    }
+
+    // ==============================
+    // تحديد الموقع تلقائياً (GPS)
+    // ==============================
+    function useGPS() {
+      if (!navigator.geolocation) {
+        alert('المتصفح لا يدعم ميزة تحديد الموقع.');
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          // في حال السماح (Allow)
+          currentLat = pos.coords.latitude;
+          currentLng = pos.coords.longitude;
+          map.flyTo([currentLat, currentLng], 17);
+          marker.setLatLng([currentLat, currentLng]);
+        },
+        function(err) {
+          // في حال الرفض (Block)
+          console.warn('تم رفض صلاحية الموقع أو تعذر الوصول إليه.');
+        },
+        { enableHighAccuracy: true } // طلب دقة عالية
+      );
+    }
+
+    // ==============================
+    // حفظ الموقع في الـ Backend
+    // ==============================
+    async function saveLocation() {
+      const btn = document.getElementById('save-btn');
+      const originalText = btn.innerHTML;
+      
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الحفظ...';
+      btn.classList.add('opacity-75');
+
+      try {
+        const res = await fetch(`${API_URL}/save-location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phoneNumber: userPhone,
+            lat: currentLat,
+            lng: currentLng
+          })
+        });
+
+        if (!res.ok) throw new Error('Server error');
+
+        // تجهيز شاشة النجاح
+        document.getElementById('success-phone').textContent = userPhone;
+        document.getElementById('success-coords').textContent =
+          `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
+
+        showStep('step3');
+      } catch(e) {
+        alert('حدث خطأ أثناء الحفظ. تأكد من أن شاشة السيرفر (Terminal) قيد التشغيل.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        btn.classList.remove('opacity-75');
+      }
+    }
+
+    // ==============================
+    // التنقل وإعادة التعيين
+    // ==============================
+    function reset() {
+      userPhone = '';
+      document.getElementById('phone-input').value = '';
+      document.getElementById('search-input').value = '';
+      document.getElementById('search-results').classList.add('hidden');
+      if (map) { map.remove(); map = null; marker = null; }
+      currentLat = 31.95; currentLng = 35.91;
+      showStep('step1');
+    }
+
+    function showStep(stepId) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById(stepId).classList.add('active');
+    }
+
+    // إخفاء نتائج البحث عند الضغط خارجها
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#search-input') && !e.target.closest('#search-results')) {
+        document.getElementById('search-results').classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

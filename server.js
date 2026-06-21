@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 
 // إعدادات أساسية للسماح باستقبال البيانات من المتصفح
-app.use(cors());
+app.use(cors({ origin: "*" })); // السماح لأي موقع بالاتصال بالسيرفر
 app.use(express.json()); 
 
 // 1. الاتصال بقاعدة البيانات

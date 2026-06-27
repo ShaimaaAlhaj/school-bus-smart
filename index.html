@@ -235,11 +235,12 @@
 // ==============================
     // خطوة 1: التحقق من الهاتف والانتقال
     // ==============================
-    function goToMap() {
+    // ==============================
+    // خطوة 1: التحقق من الهاتف بالسيرفر والانتقال
+    // ==============================
+    async function goToMap() {
       const phone = document.getElementById('phone-input').value.trim();
       const err = document.getElementById('phone-error');
-
-      // شرط صارم: يجب أن يبدأ بـ 07 وبعده 8 أرقام (المجموع 10)
       const phoneRegex = /^07\d{8}$/;
 
       if (!phoneRegex.test(phone)) {
@@ -248,20 +249,51 @@
         return;
       }
 
-      // إذا الرقم صحيح، نخفي رسالة الخطأ ونكمل
       err.classList.add('hidden');
-      userPhone = phone;
-      document.getElementById('display-phone').textContent = phone;
 
-      // إظهار شاشة الخريطة
-      showStep('step2');
+      // تغيير شكل الزر ليظهر "جاري التحقق..."
+      const btn = document.querySelector('#step1 button');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري التحقق من الرقم...';
+      btn.classList.add('opacity-75');
 
-      // تهيئة الخريطة ثم إظهار التنبيه وطلب الصلاحية تلقائياً
-      setTimeout(() => {
-        initMap();
-        alert("تنبيه هام ⚠️\n\nيرجى التأكد من أنك متواجد داخل المنزل حالياً أو أمامه مباشرة قبل الموافقة على تحديد الموقع، وذلك لضمان دقة مسار باص المدرسة وعدم حدوث تأخير.");
-        useGPS();
-      }, 300);
+      try {
+        // نبعت الرقم للسيرفر نفحصه قبل ما نفتح الخريطة
+        const res = await fetch(`${API_URL}/check-phone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: phone })
+        });
+
+        // إذا السيرفر رجع خطأ (يعني الرقم مسجل)
+        if (!res.ok) {
+          const data = await res.json();
+          err.textContent = '⚠️ ' + (data.error || 'هذا الرقم مسجل مسبقاً.');
+          err.classList.remove('hidden'); // إظهار رسالة الخطأ الحمراء تحت المربع
+          return; // نوقف الكود هون وما نفتح الخريطة أبداً
+        }
+
+        // إذا كل شيء تمام والرقم مش مسجل، نكمل للخريطة
+        userPhone = phone;
+        document.getElementById('display-phone').textContent = phone;
+        showStep('step2');
+
+        setTimeout(() => {
+          initMap();
+          alert("تنبيه هام ⚠️\n\nيرجى التأكد من أنك متواجد داخل المنزل حالياً أو أمامه مباشرة قبل الموافقة على تحديد الموقع، وذلك لضمان دقة مسار باص المدرسة وعدم حدوث تأخير.");
+          useGPS();
+        }, 300);
+
+      } catch (e) {
+        err.textContent = '⚠️ حدث خطأ في الاتصال. تأكد من الإنترنت أو حاول بعد قليل.';
+        err.classList.remove('hidden');
+      } finally {
+        // إرجاع الزر لشكله الطبيعي
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        btn.classList.remove('opacity-75');
+      }
     }
 
     // ==============================

@@ -28,27 +28,23 @@ const Location = mongoose.model('Location', locationSchema);
 
 // 3. مسار (API) لاستقبال الإحداثيات من واجهة المستخدم
 // 3. مسار (API) لاستقبال الإحداثيات من واجهة المستخدم
-app.post('/api/save-location', async (req, res) => {
+// مسار (API) للتحقق من الرقم قبل السماح بالدخول للخريطة
+app.post('/api/check-phone', async (req, res) => {
   try {
-    const { phoneNumber, lat, lng } = req.body;
+    const { phoneNumber } = req.body;
     
-    // -- التعديل الجديد: التحقق إذا كان الرقم موجود مسبقاً --
+    // فحص قاعدة البيانات
     const existingLocation = await Location.findOne({ phoneNumber: phoneNumber });
     
     if (existingLocation) {
-      // إذا لقي الرقم، بيرجع رسالة خطأ (Status 400) وما بكمل حفظ أبداً
-      return res.status(400).json({ error: 'عذراً، هذا الرقم مسجل مسبقاً في النظام!' });
+      // إذا الرقم موجود، نرجع خطأ
+      return res.status(400).json({ error: 'عذراً، هذا الرقم مسجل مسبقاً. لا يمكنك المتابعة.' });
     }
-    // --------------------------------------------------------
 
-    // إذا الرقم مش موجود، بننشئ سجل جديد وبنحفظه
-    const newLocation = new Location({ phoneNumber, lat, lng });
-    await newLocation.save(); 
-
-    console.log(`تم استلام وحفظ موقع جديد للرقم: ${phoneNumber}`);
-    res.status(201).json({ message: 'تم حفظ الموقع بنجاح!' });
+    // إذا الرقم مش موجود، نعطي الضوء الأخضر
+    res.status(200).json({ message: 'الرقم متاح' });
   } catch (error) {
-    console.error("خطأ أثناء الحفظ:", error);
+    console.error("خطأ أثناء فحص الرقم:", error);
     res.status(500).json({ error: 'حدث خطأ داخلي في السيرفر' });
   }
 });

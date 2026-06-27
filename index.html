@@ -351,6 +351,9 @@
     // ==============================
     // حفظ الموقع في الـ Backend
     // ==============================
+  // ==============================
+    // حفظ الموقع في الـ Backend
+    // ==============================
     async function saveLocation() {
       const btn = document.getElementById('save-btn');
       const originalText = btn.innerHTML;
@@ -370,16 +373,23 @@
           })
         });
 
-        if (!res.ok) throw new Error('Server error');
+        // تحويل رد السيرفر إلى JSON لنقدر نقرأ رسالة الخطأ
+        const data = await res.json();
 
-        // تجهيز شاشة النجاح
+        // التحقق إذا السيرفر رجع خطأ (زي إنو الرقم مكرر)
+        if (!res.ok) {
+           alert(data.error || 'حدث خطأ أثناء الحفظ.');
+           return; // بنوقف العملية فوراً وما بنروح لشاشة النجاح
+        }
+
+        // تجهيز شاشة النجاح إذا كل شي تمام والرقم جديد
         document.getElementById('success-phone').textContent = userPhone;
         document.getElementById('success-coords').textContent =
           `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
 
         showStep('step3');
       } catch(e) {
-        alert('حدث خطأ أثناء الحفظ. تأكد من أن شاشة السيرفر (Terminal) قيد التشغيل.');
+        alert('حدث خطأ أثناء الاتصال بالسيرفر. تأكد من شاشة السيرفر (Terminal) أو اتصالك بالإنترنت.');
       } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;

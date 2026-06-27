@@ -27,13 +27,23 @@ const locationSchema = new mongoose.Schema({
 const Location = mongoose.model('Location', locationSchema);
 
 // 3. مسار (API) لاستقبال الإحداثيات من واجهة المستخدم
+// 3. مسار (API) لاستقبال الإحداثيات من واجهة المستخدم
 app.post('/api/save-location', async (req, res) => {
   try {
     const { phoneNumber, lat, lng } = req.body;
     
-    // إنشاء سجل جديد وحفظه
+    // -- التعديل الجديد: التحقق إذا كان الرقم موجود مسبقاً --
+    const existingLocation = await Location.findOne({ phoneNumber: phoneNumber });
+    
+    if (existingLocation) {
+      // إذا لقي الرقم، بيرجع رسالة خطأ (Status 400) وما بكمل حفظ أبداً
+      return res.status(400).json({ error: 'عذراً، هذا الرقم مسجل مسبقاً في النظام!' });
+    }
+    // --------------------------------------------------------
+
+    // إذا الرقم مش موجود، بننشئ سجل جديد وبنحفظه
     const newLocation = new Location({ phoneNumber, lat, lng });
-    await newLocation.save(); // هنا يحدث السحر: يتم إنشاء الداتا بيز تلقائياً إذا لم تكن موجودة!
+    await newLocation.save(); 
 
     console.log(`تم استلام وحفظ موقع جديد للرقم: ${phoneNumber}`);
     res.status(201).json({ message: 'تم حفظ الموقع بنجاح!' });
